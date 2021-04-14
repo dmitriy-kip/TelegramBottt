@@ -2,7 +2,9 @@ import org.telegram.telegrambots.ApiContextInitializer;
 import org.telegram.telegrambots.TelegramBotsApi;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Update;
+import org.telegram.telegrambots.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -12,6 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Bot extends TelegramLongPollingBot {
+    SendMessage sendMessage = new SendMessage();
+
     public static void main(String[] args) {
         ApiContextInitializer.init(); // Инициализируем апи
         TelegramBotsApi botapi = new TelegramBotsApi();
@@ -30,14 +34,16 @@ public class Bot extends TelegramLongPollingBot {
             sendMsg(update.getMessage().getChatId().toString(), update.getMessage().getContact().getPhoneNumber());
         else {
             if (message.equals("/start"))
-                txt = "Работает!";
+                txt = "Здравствуйте! Для того что бы получить ваши показания, нам нужно посмотреть ваш номер телефона. Разрешите нам посмотреть, пожалуйста.";
             else txt = "Что то пошло не так, но чуть чуть работает";
             sendMsg(update.getMessage().getChatId().toString(), txt);
         }
     }
 
+
+
     public synchronized void sendMsg(String chatId, String s) {
-        SendMessage sendMessage = new SendMessage();
+
         sendMessage.enableMarkdown(true);
         sendMessage.setChatId(chatId);
         sendMessage.setText(s);
@@ -51,7 +57,7 @@ public class Bot extends TelegramLongPollingBot {
         KeyboardRow row1 = new KeyboardRow();
 
         KeyboardButton keyboardButton = new KeyboardButton();
-        keyboardButton.setText("Телефон");
+        keyboardButton.setText("Разрешаю!");
         keyboardButton.setRequestContact(true);
 
         row1.add(keyboardButton);

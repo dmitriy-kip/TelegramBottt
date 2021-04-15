@@ -1,14 +1,15 @@
-import org.telegram.telegrambots.ApiContextInitializer;
-import org.telegram.telegrambots.TelegramBotsApi;
-import org.telegram.telegrambots.api.methods.send.SendMessage;
-import org.telegram.telegrambots.api.objects.Update;
-import org.telegram.telegrambots.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.api.objects.replykeyboard.buttons.KeyboardButton;
-import org.telegram.telegrambots.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.TelegramBotsApi;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,33 +17,68 @@ import java.util.List;
 public class Bot extends TelegramLongPollingBot {
     SendMessage sendMessage = new SendMessage();
 
+
     public static void main(String[] args) {
-        ApiContextInitializer.init(); // Инициализируем апи
-        TelegramBotsApi botapi = new TelegramBotsApi();
         try {
-            botapi.registerBot(new Bot());
+            TelegramBotsApi botApi = new TelegramBotsApi(DefaultBotSession.class);
+            botApi.registerBot(new Bot());
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
     }
 
     public void onUpdateReceived(Update update) {
+        String chatId = update.getMessage().getChatId().toString();
         String message = update.getMessage().getText();
-        System.out.println(update.getMessage().getContact());
         String txt;
         if (update.getMessage().getContact() != null)
-            sendMsg(update.getMessage().getChatId().toString(), update.getMessage().getContact().getPhoneNumber());
+            sendMsg(chatId, update.getMessage().getContact().getPhoneNumber());
         else {
             if (message.equals("/start"))
-                txt = "Здравствуйте! Для того что бы получить ваши показания, нам нужно посмотреть ваш номер телефона. Разрешите нам посмотреть, пожалуйста.";
+                txt = "Здравствуйте! Для того что бы получить ваши показания, нам нужно посмотреть ваш номер телефона. Разрешите нам посмотреть его, пожалуйста.";
             else txt = "Что то пошло не так, но чуть чуть работает";
-            sendMsg(update.getMessage().getChatId().toString(), txt);
+            startMsg(chatId, txt);
+        }
+    }
+
+    private void sendMsg(String chatId, String phoneNumber) {
+        sendMessage.enableMarkdown(true);
+        sendMessage.setChatId(chatId);
+        sendMessage.setText(phoneNumber + "\nЭто ваш номер телефона?");
+
+        InlineKeyboardMarkup inline = new InlineKeyboardMarkup();
+
+        InlineKeyboardButton buttonYes = new InlineKeyboardButton();
+        InlineKeyboardButton buttonNo = new InlineKeyboardButton();
+
+        buttonYes.setText("Да");
+        buttonYes.setCallbackData("yes");
+        buttonNo.setText("Нет");
+        buttonNo.setCallbackData("no");
+
+        List<InlineKeyboardButton> keyboardButtonsRow1 = new ArrayList<InlineKeyboardButton>();
+        keyboardButtonsRow1.add(buttonYes);
+        keyboardButtonsRow1.add(buttonNo);
+        List<List<InlineKeyboardButton>> rowList = new ArrayList<List<InlineKeyboardButton>>();
+        rowList.add(keyboardButtonsRow1);
+        inline.setKeyboard(rowList);
+
+        ReplyKeyboardRemove rr = new ReplyKeyboardRemove();
+        rr.setRemoveKeyboard(true);
+        sendMessage.setReplyMarkup(rr);
+        sendMessage.setReplyMarkup(inline);
+
+
+        try {
+            execute(sendMessage);
+        } catch (TelegramApiException e) {
+            //log.log(Level.SEVERE, "Exception: ", e.toString());
+            e.printStackTrace();
         }
     }
 
 
-
-    public synchronized void sendMsg(String chatId, String s) {
+    public synchronized void startMsg(String chatId, String s) {
 
         sendMessage.enableMarkdown(true);
         sendMessage.setChatId(chatId);
@@ -72,8 +108,6 @@ public class Bot extends TelegramLongPollingBot {
         }
 
     }
-
-
 
     public String getBotUsername() {
         return "meter_reading_sender_bot";

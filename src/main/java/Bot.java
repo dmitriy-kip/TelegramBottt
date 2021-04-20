@@ -15,7 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Bot extends TelegramLongPollingBot {
-    SendMessage sendMessage = new SendMessage();
+    private SendMessage sendMessage = new SendMessage();
+    private String txt;
 
 
     public static void main(String[] args) {
@@ -29,16 +30,30 @@ public class Bot extends TelegramLongPollingBot {
 
     public void onUpdateReceived(Update update) {
         String chatId = update.getMessage().getChatId().toString();
-        String message = update.getMessage().getText();
-        String txt;
-        if (update.getMessage().getContact() != null)
+
+        if (update.getMessage().hasText()){
+            String message = update.getMessage().getText();
+            if (message.equals("/start")) {
+                txt = "Здравствуйте! Для того что бы получить ваши показания, нам нужно посмотреть ваш номер телефона. Разрешите нам посмотреть его, пожалуйста.";
+            }
+
+            startMsg(chatId, txt);
+        }
+        if (update.getMessage().hasContact()){
+            sendMsg(chatId, update.getMessage().getContact().getPhoneNumber());
+        }
+        if (update.hasCallbackQuery()){
+
+        }
+
+        /*if (update.getMessage().getContact() != null)
             sendMsg(chatId, update.getMessage().getContact().getPhoneNumber());
         else {
             if (message.equals("/start"))
                 txt = "Здравствуйте! Для того что бы получить ваши показания, нам нужно посмотреть ваш номер телефона. Разрешите нам посмотреть его, пожалуйста.";
             else txt = "Что то пошло не так, но чуть чуть работает";
             startMsg(chatId, txt);
-        }
+        }*/
     }
 
     private void sendMsg(String chatId, String phoneNumber) {
@@ -63,9 +78,9 @@ public class Bot extends TelegramLongPollingBot {
         rowList.add(keyboardButtonsRow1);
         inline.setKeyboard(rowList);
 
-        ReplyKeyboardRemove rr = new ReplyKeyboardRemove();
+        /*ReplyKeyboardRemove rr = new ReplyKeyboardRemove();
         rr.setRemoveKeyboard(true);
-        sendMessage.setReplyMarkup(rr);
+        sendMessage.setReplyMarkup(rr);*/
         sendMessage.setReplyMarkup(inline);
 
 
@@ -85,6 +100,7 @@ public class Bot extends TelegramLongPollingBot {
         sendMessage.setText(s);
 
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
+        replyKeyboardMarkup.setOneTimeKeyboard(true);
         sendMessage.setReplyMarkup(replyKeyboardMarkup);
         replyKeyboardMarkup.setSelective(true);
         replyKeyboardMarkup.setResizeKeyboard(true);
@@ -110,11 +126,11 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     public String getBotUsername() {
-        return "meter_reading_sender_bot";
+        return "new_meters_sender_bot";
     }
 
     public String getBotToken() {
-        return "1794091980:AAHyVYjIGjZpSB3aFDkgMaY5Zyt5gHGW61k";
+        return "1706869454:AAEgKQr1VCTDZwFgZUhp2qh5MY8Y4l26_3I";
     }
 }
 

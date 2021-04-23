@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class Bot extends TelegramLongPollingBot {
@@ -46,6 +47,7 @@ public class Bot extends TelegramLongPollingBot {
             //надо написать валидацию
             phoneNumber = rightNumber(update.getMessage().getText());
             firstHttpRequest(phoneNumber);
+            return;
         }
         if (update.hasMessage() && update.getMessage().hasText()){
             String chatId = update.getMessage().getChatId().toString();
@@ -96,10 +98,8 @@ public class Bot extends TelegramLongPollingBot {
         }
 
         HttpGet request = new HttpGet(uri.toString());
-        request.addHeader("phone", phoneNumber);
-        request.addHeader("app_id", "-1");
 
-        System.out.println(request.toString());
+        //System.out.println(request.toString());
 
         try(CloseableHttpClient httpClient = HttpClients.createDefault();
             CloseableHttpResponse response = httpClient.execute(request))
@@ -111,13 +111,46 @@ public class Bot extends TelegramLongPollingBot {
             JSONObject obj2 = arr2.getJSONObject(0);
             String authId = obj2.getString("auth_id");
             System.out.println(authId);
+            secondHttpRequest(authId);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    private void secondHttpRequest(String authId){
+        URI uri = null;
+        try {
+            uri = new URIBuilder("http://172.16.0.227:8086/api/lists/addresses")
+                    .addParameter("auth_id", authId)
+                    .build();
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        }
 
+        HttpGet request = new HttpGet(uri.toString());
+
+        //System.out.println(request.toString());
+
+        HashMap<String, String> address = new HashMap<>();
+        try(CloseableHttpClient httpClient = HttpClients.createDefault();
+            CloseableHttpResponse response = httpClient.execute(request))
+        {
+            String json = EntityUtils.toString(response.getEntity(), "UTF-8");
+            JSONArray jsonArray = new JSONArray(json);
+            JSONObject obj = jsonArray.getJSONObject(0);
+            JSONArray arr2 = obj.getJSONArray("records");
+            for (int i = 0; i < arr2.length(); i++) {
+                JSONObject obj2 = arr2.getJSONObject(i);
+                address.put(obj2.getString("id"), obj2.getString("address"));
+            }
+
+            System.out.println(address);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     private void callBack(Update update) {
         String request = update.getCallbackQuery().getData();
@@ -131,16 +164,15 @@ public class Bot extends TelegramLongPollingBot {
             firstHttpRequest(phoneNumber);
         }
 
-        /*SendMessage sendMessage = new SendMessage();
+    }
+
+    private void getAddress(String chatId, HashMap<String,String> mapAddress){
+        SendMessage sendMessage = new SendMessage();
         sendMessage.enableMarkdown(true);
-        sendMessage.setChatId(update.getCallbackQuery().getMessage().getChatId().toString());
-        sendMessage.setText(request);
-        try {
-            execute(sendMessage);
-        } catch (TelegramApiException e) {
-            //log.log(Level.SEVERE, "Exception: ", e.toString());
-            e.printStackTrace();
-        }*/
+        sendMessage.setChatId(chatId);
+        sendMessage.setText("Выберите адрес");
+
+
     }
 
     private void getPhoneNumber(String chatId, String number) {
@@ -183,11 +215,12 @@ public class Bot extends TelegramLongPollingBot {
     }
 
 
-    public synchronized void sendMsg(String chatId, String s, SendMessage sendMessage) {
+    private synchronized void sendMsg(String chatId, String s, SendMessage sendMessage) {
         sendMessage.enableMarkdown(true);
         sendMessage.setChatId(chatId);
         sendMessage.setText(s);
 
+        txt = "";
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
@@ -197,7 +230,7 @@ public class Bot extends TelegramLongPollingBot {
 
     }
 
-    public String rightNumber(String str){
+    private String rightNumber(String str){
         return str.substring(2);
     }
 

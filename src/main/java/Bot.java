@@ -28,7 +28,6 @@ import java.util.Map;
 
 public class Bot extends TelegramLongPollingBot {
 
-    private String phoneNumber;
     private boolean isNumber = false;
     private boolean isAddress = false;
     private boolean isMeter = false;
@@ -39,6 +38,8 @@ public class Bot extends TelegramLongPollingBot {
     private String currentMeterId;
     private String currentPH;
     private String authId;
+    private String currentAddressId;
+    private String phoneNumber;
 
 
     public static void main(String[] args) {
@@ -62,7 +63,7 @@ public class Bot extends TelegramLongPollingBot {
 
                 //надо написать валидацию
                 phoneNumber = rightNumber(update.getMessage().getText()).trim();
-                firstHttpRequest(phoneNumber);
+                firstHttpRequest();
                 return;
             }
 
@@ -70,7 +71,9 @@ public class Bot extends TelegramLongPollingBot {
                 isPH = false;
 
                 //надо написать валидацию
+                //разделитель точка
                 String ph = update.getMessage().getText().trim();
+                fourthHttpRequest(ph);
                 return;
             }
 
@@ -105,7 +108,8 @@ public class Bot extends TelegramLongPollingBot {
                 isAddress = false;
                 String[] infoAddress = update.getCallbackQuery().getData().split("/");
                 currentAddress = infoAddress[1];
-                thirdHttpRequest(infoAddress[0]);
+                currentAddressId = infoAddress[0];
+                thirdHttpRequest();
                 return;
             }
             if (isMeter){
@@ -136,7 +140,7 @@ public class Bot extends TelegramLongPollingBot {
             sendMsg(update.getCallbackQuery().getMessage().getChatId().toString(), str, new SendMessage());
         }
         if (request.equals("yes")){
-            firstHttpRequest(phoneNumber);
+            firstHttpRequest();
         }
 
     }
@@ -165,6 +169,22 @@ public class Bot extends TelegramLongPollingBot {
         List<List<InlineKeyboardButton>> rowList = new ArrayList<>();
         rowList.add(keyboardButtonsRow1);
         inline.setKeyboard(rowList);
+
+        /*ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
+        replyKeyboardMarkup.setOneTimeKeyboard(false);
+        sendMessage.setReplyMarkup(replyKeyboardMarkup);
+        replyKeyboardMarkup.setSelective(true);
+        replyKeyboardMarkup.setResizeKeyboard(true);
+
+        List<KeyboardRow> keyboardRowList = new ArrayList<>();
+        KeyboardRow row1 = new KeyboardRow();
+
+        KeyboardButton keyboardButton = new KeyboardButton();
+        keyboardButton.setText("proverka");
+
+        row1.add(keyboardButton);
+        keyboardRowList.add(row1);
+        replyKeyboardMarkup.setKeyboard(keyboardRowList);*/
 
         /*ReplyKeyboardRemove rr = new ReplyKeyboardRemove();
         rr.setRemoveKeyboard(true);
@@ -254,10 +274,10 @@ public class Bot extends TelegramLongPollingBot {
 
     }
 
-    private void firstHttpRequest(String phoneNumber) {
+    private void firstHttpRequest() {
         URI uri = null;
         try {
-            uri = new URIBuilder("http://prog-matik.ru:8086/api/auth")
+            uri = new URIBuilder("http://172.16.0.227:8086/api/auth")
                     .addParameter("phone", phoneNumber)
                     .addParameter("app_id", "-1")
                     .build();
@@ -289,7 +309,7 @@ public class Bot extends TelegramLongPollingBot {
     private void secondHttpRequest(){
         URI uri = null;
         try {
-            uri = new URIBuilder("http://prog-matik.ru:8086/api/lists/addresses")
+            uri = new URIBuilder("http://172.16.0.227:8086/api/lists/addresses")
                     .addParameter("auth_id", authId)
                     .build();
         } catch (URISyntaxException e) {
@@ -321,12 +341,12 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void thirdHttpRequest(String addressId) {
+    private void thirdHttpRequest() {
         URI uri = null;
         try {
-            uri = new URIBuilder("http://prog-matik.ru:8086/api/lists/meters")
+            uri = new URIBuilder("http://172.16.0.227:8086/api/lists/meters")
                     .addParameter("auth_id", authId)
-                    .addParameter("address_id", addressId)
+                    .addParameter("address_id", currentAddressId)
                     .build();
         } catch (URISyntaxException e) {
             e.printStackTrace();
@@ -347,7 +367,41 @@ public class Bot extends TelegramLongPollingBot {
             }
 
             getMeter(meters);
-            //System.out.println(address);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void fourthHttpRequest(String ph){
+        URI uri = null;
+        try {
+            uri = new URIBuilder("http://172.16.0.227:8086/api/sayind")
+                    .addParameter("address_id", currentAddressId)
+                    .addParameter("meter_id", currentMeterId)
+                    .addParameter("ind", ph)
+                    .build();
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        }
+
+        HttpGet request = new HttpGet(uri.toString());
+        try(CloseableHttpClient httpClient = HttpClients.createDefault();
+            CloseableHttpResponse response = httpClient.execute(request))
+        {
+            String json = EntityUtils.toString(response.getEntity(), "UTF-8");
+            JSONArray jsonArray = new JSONArray(json);
+            JSONObject obj = jsonArray.getJSONObject(0);
+            String msg = obj.getString("msg");
+            switch (msg){
+                case "OK":
+                    sendMsg(chatId, "Показания приняты!", new SendMessage());
+                    break;
+                case "Charge of one of meters already exists":
+                    sendMsg(chatId, "По данному счетчику уже есть показания.", new SendMessage());
+                    break;
+                default:
+            }
 
         } catch (IOException e) {
             e.printStackTrace();

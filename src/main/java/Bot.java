@@ -12,6 +12,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
@@ -137,7 +138,11 @@ public class Bot extends TelegramLongPollingBot {
         if (request.equals("no")){
             isNumber = true;
             String str = "Введите ваш номер телефона";
-            sendMsg(update.getCallbackQuery().getMessage().getChatId().toString(), str, new SendMessage());
+            SendMessage sendMessage = new SendMessage();
+            ReplyKeyboardRemove rr = new ReplyKeyboardRemove();
+            rr.setRemoveKeyboard(true);
+            sendMessage.setReplyMarkup(rr);
+            sendMsg(update.getCallbackQuery().getMessage().getChatId().toString(), str, sendMessage);
         }
         if (request.equals("yes")){
             firstHttpRequest();
@@ -170,25 +175,6 @@ public class Bot extends TelegramLongPollingBot {
         rowList.add(keyboardButtonsRow1);
         inline.setKeyboard(rowList);
 
-        /*ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
-        replyKeyboardMarkup.setOneTimeKeyboard(false);
-        sendMessage.setReplyMarkup(replyKeyboardMarkup);
-        replyKeyboardMarkup.setSelective(true);
-        replyKeyboardMarkup.setResizeKeyboard(true);
-
-        List<KeyboardRow> keyboardRowList = new ArrayList<>();
-        KeyboardRow row1 = new KeyboardRow();
-
-        KeyboardButton keyboardButton = new KeyboardButton();
-        keyboardButton.setText("proverka");
-
-        row1.add(keyboardButton);
-        keyboardRowList.add(row1);
-        replyKeyboardMarkup.setKeyboard(keyboardRowList);*/
-
-        /*ReplyKeyboardRemove rr = new ReplyKeyboardRemove();
-        rr.setRemoveKeyboard(true);
-        sendMessage.setReplyMarkup(rr);*/
         sendMessage.setReplyMarkup(inline);
 
 

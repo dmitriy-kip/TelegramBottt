@@ -12,7 +12,6 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
@@ -35,9 +34,7 @@ public class Bot extends TelegramLongPollingBot {
     private boolean isPH = false;
     private String chatId;
     private String currentAddress;
-    private String currentService;
     private String currentMeterId;
-    private String currentPH;
     private String authId;
     private String currentAddressId;
     private String phoneNumber;
@@ -54,34 +51,15 @@ public class Bot extends TelegramLongPollingBot {
 
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()){
-            String txt = "";
             String chatId = update.getMessage().getChatId().toString();
             String message = update.getMessage().getText();
             SendMessage sendMessage = new SendMessage();
 
-            if (isNumber){
-                isNumber = false;
-
-                //надо написать валидацию
-                phoneNumber = rightNumber(update.getMessage().getText()).trim();
-                firstHttpRequest();
-                return;
-            }
-
-            if (isPH){
-                isPH = false;
-
-                //надо написать валидацию
-                //разделитель точка
-                String ph = update.getMessage().getText().trim();
-                fourthHttpRequest(ph);
-                return;
-            }
-
             if (message.equals("/start")) {
+                isNumber = false;
+                isPH = false;
                 ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
-                replyKeyboardMarkup.setOneTimeKeyboard(true);
-                sendMessage.setReplyMarkup(replyKeyboardMarkup);
+                replyKeyboardMarkup.setOneTimeKeyboard(false);
                 replyKeyboardMarkup.setSelective(true);
                 replyKeyboardMarkup.setResizeKeyboard(true);
 
@@ -95,14 +73,82 @@ public class Bot extends TelegramLongPollingBot {
                 row1.add(keyboardButton);
                 keyboardRowList.add(row1);
                 replyKeyboardMarkup.setKeyboard(keyboardRowList);
-                txt = "Здравствуйте! Для того что бы внести показания, нам нужно посмотреть ваш номер телефона. Разрешите нам посмотреть его, пожалуйста.";
+
+                sendMessage.setReplyMarkup(replyKeyboardMarkup);
+                String txt = "Здравствуйте! Для того что бы внести показания, нам нужно посмотреть ваш номер телефона. Разрешите нам посмотреть его, пожалуйста.";
+                sendMsg(chatId, txt, sendMessage);
             }
 
-            sendMsg(chatId, txt, sendMessage);
+            if (message.equals("Другой номер")){
+                isNumber = false;
+                isPH = false;
+                newPhoneNumber();
+                return;
+            }
+
+            if (message.equals("Сдать показания")){
+                isNumber = false;
+                isPH = false;
+                firstHttpRequest();
+                return;
+            }
+
+            //ожидаем номер телефона
+            if (isNumber){
+                isNumber = false;
+
+                String number = update.getMessage().getText().trim();
+                if (number.charAt(0) != '+'){
+                    isNumber = true;
+                    sendMsg(chatId, "Я вас не понимаю, введите номер телефона по шаблону: +79001234567. Попробуйте еще раз.",
+                            new SendMessage());
+                    return;
+                }
+                for (int i = 1; i < number.length(); i++) {
+                    char c = number.charAt(i);
+                    if (!(c >= '0' && c <= '9')) {
+                        isPH = true;
+                        sendMsg(chatId, "Я вас не понимаю, введите номер телефона по шаблону: +79001234567. Попробуйте еще раз.",
+                                new SendMessage());
+                        return;
+                    }
+                }
+
+                phoneNumber = rightNumber(number);
+                firstHttpRequest();
+                return;
+            }
+
+            //ожидаем показания
+            if (isPH){
+                isPH = false;
+
+                String ph = update.getMessage().getText().trim();
+                //проверка на число
+                for (int i = 0; i < ph.length(); i++) {
+                    char c = ph.charAt(i);
+                    if (!((c >= '0' && c <= '9') || c == '.' || c == ',')) {
+                        isPH = true;
+                        sendMsg(chatId, "Вы ввели не числовое значение. Попробуйте еще раз.", new SendMessage());
+                        return;
+                    }
+                }
+                ph = ph.replaceAll(",",".");
+                //проверка на то что запятых или точек не больше одной
+                if (ph.length() - ph.replaceAll("\\.","").length() > 1){
+                    isPH = true;
+                    sendMsg(chatId, "Вы ввели не корректное значение. Попробуйте еще раз.", new SendMessage());
+                    return;
+                }
+                fourthHttpRequest(ph);
+                return;
+            }
+
         }
         if (update.hasMessage() && update.getMessage().hasContact()){
             String chatId = update.getMessage().getChatId().toString();
-            getPhoneNumber(chatId, update.getMessage().getContact().getPhoneNumber());
+            String number = "+" + update.getMessage().getContact().getPhoneNumber();
+            getPhoneNumber(chatId, number);
         }
         if (update.hasCallbackQuery()){
             if (isAddress){
@@ -119,8 +165,8 @@ public class Bot extends TelegramLongPollingBot {
 
                 String[] infoMeter = update.getCallbackQuery().getData().split("/");
                 currentMeterId = infoMeter[0];
-                currentService = infoMeter[1];
-                currentPH = infoMeter[2];
+                String currentService = infoMeter[1];
+                String currentPH = infoMeter[2];
 
                 sendMsg(update.getCallbackQuery().getMessage().getChatId().toString(), "Адрес: " + currentAddress + "\nУслуга: " +
                         currentService + "\nТекущие показания: " + currentPH + "\nВведите ваши показания:", new SendMessage());
@@ -136,13 +182,10 @@ public class Bot extends TelegramLongPollingBot {
         chatId = update.getCallbackQuery().getMessage().getChatId().toString();
 
         if (request.equals("no")){
-            isNumber = true;
+            /*isNumber = true;
             String str = "Введите ваш номер телефона";
-            SendMessage sendMessage = new SendMessage();
-            ReplyKeyboardRemove rr = new ReplyKeyboardRemove();
-            rr.setRemoveKeyboard(true);
-            sendMessage.setReplyMarkup(rr);
-            sendMsg(update.getCallbackQuery().getMessage().getChatId().toString(), str, sendMessage);
+            sendMsg(update.getCallbackQuery().getMessage().getChatId().toString(), str, new SendMessage());*/
+            newPhoneNumber();
         }
         if (request.equals("yes")){
             firstHttpRequest();
@@ -150,13 +193,42 @@ public class Bot extends TelegramLongPollingBot {
 
     }
 
+    private void newPhoneNumber(){
+        isNumber = true;
+        String str = "Введите ваш номер телефона";
+        sendMsg(chatId, str, new SendMessage());
+    }
+
     private void getPhoneNumber(String chatId, String number) {
         phoneNumber = rightNumber(number);
+
+        SendMessage sendMessage1 = new SendMessage();
+        ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
+        replyKeyboardMarkup.setOneTimeKeyboard(false);
+        replyKeyboardMarkup.setSelective(true);
+        replyKeyboardMarkup.setResizeKeyboard(true);
+
+        List<KeyboardRow> keyboardRowList = new ArrayList<>();
+        KeyboardRow row1 = new KeyboardRow();
+
+        KeyboardButton keyboardButton = new KeyboardButton();
+        keyboardButton.setText("Другой номер");
+
+        KeyboardButton keyboardButton1 = new KeyboardButton();
+        keyboardButton1.setText("Сдать показания");
+
+        row1.add(keyboardButton);
+        row1.add(keyboardButton1);
+        keyboardRowList.add(row1);
+        replyKeyboardMarkup.setKeyboard(keyboardRowList);
+        sendMessage1.setReplyMarkup(replyKeyboardMarkup);
+        sendMessage1.setChatId(chatId);
+        sendMessage1.setText(number);
 
         SendMessage sendMessage = new SendMessage();
         sendMessage.enableMarkdown(true);
         sendMessage.setChatId(chatId);
-        sendMessage.setText(number + "\nЭто ваш номер телефона?");
+        sendMessage.setText("Это ваш номер телефона?");
 
         InlineKeyboardMarkup inline = new InlineKeyboardMarkup();
 
@@ -176,9 +248,8 @@ public class Bot extends TelegramLongPollingBot {
         inline.setKeyboard(rowList);
 
         sendMessage.setReplyMarkup(inline);
-
-
         try {
+            execute(sendMessage1);
             execute(sendMessage);
         } catch (TelegramApiException e) {
             //log.log(Level.SEVERE, "Exception: ", e.toString());
@@ -263,7 +334,7 @@ public class Bot extends TelegramLongPollingBot {
     private void firstHttpRequest() {
         URI uri = null;
         try {
-            uri = new URIBuilder("http://172.16.0.227:8086/api/auth")
+            uri = new URIBuilder("http://prog-matik.ru:8086/api/auth")
                     .addParameter("phone", phoneNumber)
                     .addParameter("app_id", "-1")
                     .build();
@@ -295,7 +366,7 @@ public class Bot extends TelegramLongPollingBot {
     private void secondHttpRequest(){
         URI uri = null;
         try {
-            uri = new URIBuilder("http://172.16.0.227:8086/api/lists/addresses")
+            uri = new URIBuilder("http://prog-matik.ru:8086/api/lists/addresses")
                     .addParameter("auth_id", authId)
                     .build();
         } catch (URISyntaxException e) {
@@ -313,13 +384,25 @@ public class Bot extends TelegramLongPollingBot {
             String json = EntityUtils.toString(response.getEntity(), "UTF-8");
             JSONArray jsonArray = new JSONArray(json);
             JSONObject obj = jsonArray.getJSONObject(0);
-            JSONArray arr2 = obj.getJSONArray("records");
-            for (int i = 0; i < arr2.length(); i++) {
-                JSONObject obj2 = arr2.getJSONObject(i);
-                address.put(obj2.getString("id"), obj2.getString("address"));
+            switch (obj.getString("msg")){
+                case "OK":
+                    JSONArray arr2 = obj.getJSONArray("records");
+                    for (int i = 0; i < arr2.length(); i++) {
+                        JSONObject obj2 = arr2.getJSONObject(i);
+                        address.put(obj2.getString("id"), obj2.getString("address"));
+                    }
+                    getAddress(address);
+                    break;
+                case "Addresses list not received":
+                    sendMsg(chatId, "Вы не зарегистрированы в системе, пожалуйста зарегистрируйтесь через личный кабинет.",
+                            new SendMessage());
+                    break;
+                default:
+                    sendMsg(chatId, "Что-то пошло не так, пожалуйста сообщите об этом в вашу УК.",
+                        new SendMessage());
+                    break;
             }
 
-            getAddress(address);
             //System.out.println(address);
 
         } catch (IOException e) {
@@ -330,7 +413,7 @@ public class Bot extends TelegramLongPollingBot {
     private void thirdHttpRequest() {
         URI uri = null;
         try {
-            uri = new URIBuilder("http://172.16.0.227:8086/api/lists/meters")
+            uri = new URIBuilder("http://prog-matik.ru:8086/api/lists/meters")
                     .addParameter("auth_id", authId)
                     .addParameter("address_id", currentAddressId)
                     .build();
@@ -346,13 +429,24 @@ public class Bot extends TelegramLongPollingBot {
             String json = EntityUtils.toString(response.getEntity(), "UTF-8");
             JSONArray jsonArray = new JSONArray(json);
             JSONObject obj = jsonArray.getJSONObject(0);
-            JSONArray arr2 = obj.getJSONArray("records");
-            for (int i = 0; i < arr2.length(); i++) {
-                JSONObject obj2 = arr2.getJSONObject(i);
-                meters.put(obj2.getString("meter_id"), obj2.getString("service") + "/" + obj2.getString("current_ph"));
+            switch (obj.getString("msg")) {
+                case "OK":
+                    JSONArray arr2 = obj.getJSONArray("records");
+                    for (int i = 0; i < arr2.length(); i++) {
+                        JSONObject obj2 = arr2.getJSONObject(i);
+                        meters.put(obj2.getString("meter_id"), obj2.getString("service") + "/" + obj2.getString("current_ph"));
+                    }
+                    getMeter(meters);
+                    break;
+                case "Meters list not received":
+                    sendMsg(chatId, "На этом адресе нет счетчиков или у них кончился срок поверки.",
+                            new SendMessage());
+                    break;
+                default:
+                    sendMsg(chatId, "Что-то пошло не так, пожалуйста сообщите об этом в вашу УК.",
+                            new SendMessage());
+                    break;
             }
-
-            getMeter(meters);
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -362,7 +456,7 @@ public class Bot extends TelegramLongPollingBot {
     private void fourthHttpRequest(String ph){
         URI uri = null;
         try {
-            uri = new URIBuilder("http://172.16.0.227:8086/api/sayind")
+            uri = new URIBuilder("http://prog-matik.ru:8086/api/sayind")
                     .addParameter("address_id", currentAddressId)
                     .addParameter("meter_id", currentMeterId)
                     .addParameter("ind", ph)
@@ -399,11 +493,11 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     public String getBotUsername() {
-        return "new_meters_sender_bot";
+        return "meters_sender_bot";
     }
 
     public String getBotToken() {
-        return "1706869454:AAEgKQr1VCTDZwFgZUhp2qh5MY8Y4l26_3I";
+        return "1736097569:AAFmErv3KEfMZFKeC7IwXkxMs-ZjY-YaXZc";
     }
 }
 

@@ -37,7 +37,7 @@ public class Bot extends TelegramLongPollingBot {
     private String currentMeterId;
     private String authId;
     private String currentAddressId;
-    private String phoneNumber;
+    //private String phoneNumber;
 
 
     public static void main(String[] args) {
@@ -114,8 +114,7 @@ public class Bot extends TelegramLongPollingBot {
                     }
                 }
 
-                phoneNumber = rightNumber(number);
-                firstHttpRequest();
+                firstHttpRequest(number.substring(2));
                 return;
             }
 
@@ -188,7 +187,7 @@ public class Bot extends TelegramLongPollingBot {
             newPhoneNumber();
         }
         if (request.equals("yes")){
-            firstHttpRequest();
+            firstHttpRequest(update.getCallbackQuery().getMessage().getChatId().toString().substring(1));
         }
 
     }
@@ -200,8 +199,6 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     private void getPhoneNumber(String chatId, String number) {
-        phoneNumber = rightNumber(number);
-
         SendMessage sendMessage1 = new SendMessage();
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
         replyKeyboardMarkup.setOneTimeKeyboard(false);
@@ -331,7 +328,7 @@ public class Bot extends TelegramLongPollingBot {
 
     }
 
-    private void firstHttpRequest() {
+    private void firstHttpRequest(String phoneNumber) {
         URI uri = null;
         try {
             uri = new URIBuilder("http://prog-matik.ru:8086/api/auth")
@@ -486,10 +483,6 @@ public class Bot extends TelegramLongPollingBot {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private String rightNumber(String str){
-        return str.substring(2);
     }
 
     public String getBotUsername() {

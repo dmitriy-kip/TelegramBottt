@@ -32,12 +32,10 @@ public class Bot extends TelegramLongPollingBot {
     private boolean isAddress = false;
     private boolean isMeter = false;
     private boolean isPH = false;
-    private String chatId;
-    private String currentAddress;
-    private String currentMeterId;
+
+    //private String currentMeterId;
     private String authId;
     private String currentAddressId;
-    //private String phoneNumber;
 
 
     public static void main(String[] args) {
@@ -50,6 +48,7 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     public void onUpdateReceived(Update update) {
+
         if (update.hasMessage() && update.getMessage().hasText()){
             String chatId = update.getMessage().getChatId().toString();
             String message = update.getMessage().getText();
@@ -82,7 +81,7 @@ public class Bot extends TelegramLongPollingBot {
             if (message.equals("Другой номер")){
                 isNumber = false;
                 isPH = false;
-                newPhoneNumber();
+                newPhoneNumber(chatId);
                 return;
             }
 
@@ -114,7 +113,7 @@ public class Bot extends TelegramLongPollingBot {
                     }
                 }
 
-                firstHttpRequest(number.substring(2));
+                firstHttpRequest(number.substring(2), chatId);
                 return;
             }
 
@@ -139,7 +138,7 @@ public class Bot extends TelegramLongPollingBot {
                     sendMsg(chatId, "Вы ввели не корректное значение. Попробуйте еще раз.", new SendMessage());
                     return;
                 }
-                fourthHttpRequest(ph);
+                fourthHttpRequest(ph, chatId);
                 return;
             }
 
@@ -150,12 +149,14 @@ public class Bot extends TelegramLongPollingBot {
             getPhoneNumber(chatId, number);
         }
         if (update.hasCallbackQuery()){
+            String currentAddress;
+            String currentMeterId;
             if (isAddress){
                 isAddress = false;
                 String[] infoAddress = update.getCallbackQuery().getData().split("/");
                 currentAddress = infoAddress[1];
                 currentAddressId = infoAddress[0];
-                thirdHttpRequest();
+                thirdHttpRequest(update.getCallbackQuery().getMessage().getChatId().toString(), currentAddress);
                 return;
             }
             if (isMeter){
@@ -178,21 +179,21 @@ public class Bot extends TelegramLongPollingBot {
 
     private void callBack(Update update) {
         String request = update.getCallbackQuery().getData();
-        chatId = update.getCallbackQuery().getMessage().getChatId().toString();
 
         if (request.equals("no")){
             /*isNumber = true;
             String str = "Введите ваш номер телефона";
             sendMsg(update.getCallbackQuery().getMessage().getChatId().toString(), str, new SendMessage());*/
-            newPhoneNumber();
+            newPhoneNumber(update.getCallbackQuery().getMessage().getChatId().toString());
         }
         if (request.equals("yes")){
-            firstHttpRequest(update.getCallbackQuery().getMessage().getChatId().toString().substring(1));
+            firstHttpRequest(update.getCallbackQuery().getMessage().getChatId().toString().substring(1),
+                    update.getCallbackQuery().getMessage().getChatId().toString());
         }
 
     }
 
-    private void newPhoneNumber(){
+    private void newPhoneNumber(String chatId){
         isNumber = true;
         String str = "Введите ваш номер телефона";
         sendMsg(chatId, str, new SendMessage());
@@ -254,7 +255,7 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void getAddress(HashMap<String,String> mapAddress){
+    private void getAddress(HashMap<String,String> mapAddress, String chatId){
         SendMessage sendMessage = new SendMessage();
         sendMessage.enableMarkdown(true);
         sendMessage.setChatId(chatId);
@@ -283,7 +284,7 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void getMeter(HashMap<String, String> mapMeters) {
+    private void getMeter(HashMap<String, String> mapMeters, String chatId, String currentAddress) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.enableMarkdown(true);
         sendMessage.setChatId(chatId);
@@ -328,7 +329,7 @@ public class Bot extends TelegramLongPollingBot {
 
     }
 
-    private void firstHttpRequest(String phoneNumber) {
+    private void firstHttpRequest(String phoneNumber, String chatId) {
         URI uri = null;
         try {
             uri = new URIBuilder("http://prog-matik.ru:8086/api/auth")
@@ -353,14 +354,14 @@ public class Bot extends TelegramLongPollingBot {
             JSONObject obj2 = arr2.getJSONObject(0);
             authId = obj2.getString("auth_id");
 
-            secondHttpRequest();
+            secondHttpRequest(chatId);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void secondHttpRequest(){
+    private void secondHttpRequest(String chatId){
         URI uri = null;
         try {
             uri = new URIBuilder("http://prog-matik.ru:8086/api/lists/addresses")
@@ -388,7 +389,7 @@ public class Bot extends TelegramLongPollingBot {
                         JSONObject obj2 = arr2.getJSONObject(i);
                         address.put(obj2.getString("id"), obj2.getString("address"));
                     }
-                    getAddress(address);
+                    getAddress(address, chatId);
                     break;
                 case "Addresses list not received":
                     sendMsg(chatId, "Вы не зарегистрированы в системе, пожалуйста зарегистрируйтесь через личный кабинет.",
@@ -407,7 +408,7 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void thirdHttpRequest() {
+    private void thirdHttpRequest(String chatId, String currentAddress) {
         URI uri = null;
         try {
             uri = new URIBuilder("http://prog-matik.ru:8086/api/lists/meters")
@@ -433,7 +434,7 @@ public class Bot extends TelegramLongPollingBot {
                         JSONObject obj2 = arr2.getJSONObject(i);
                         meters.put(obj2.getString("meter_id"), obj2.getString("service") + "/" + obj2.getString("current_ph"));
                     }
-                    getMeter(meters);
+                    getMeter(meters, chatId, currentAddress);
                     break;
                 case "Meters list not received":
                     sendMsg(chatId, "На этом адресе нет счетчиков или у них кончился срок поверки.",
@@ -450,7 +451,7 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void fourthHttpRequest(String ph){
+    private void fourthHttpRequest(String ph, String chatId, String currentMeterId){
         URI uri = null;
         try {
             uri = new URIBuilder("http://prog-matik.ru:8086/api/sayind")

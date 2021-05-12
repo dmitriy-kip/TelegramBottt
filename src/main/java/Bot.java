@@ -33,9 +33,10 @@ public class Bot extends TelegramLongPollingBot {
     private boolean isMeter = false;
     private boolean isPH = false;
 
-    //private String currentMeterId;
-    private String authId;
+    private String currentAddress;
+    private String currentMeterId;
     private String currentAddressId;
+
 
 
     public static void main(String[] args) {
@@ -88,7 +89,13 @@ public class Bot extends TelegramLongPollingBot {
             if (message.equals("Сдать показания")){
                 isNumber = false;
                 isPH = false;
-                firstHttpRequest();
+
+                String phone = new DatabaseHandler().getPhone(chatId);
+                if (phone != null) {
+                    firstHttpRequest(phone, chatId);
+                } else {
+                    sendMsg(chatId, "Что то пошло не так, начните заново используя комманду /start .", new SendMessage());
+                }
                 return;
             }
 
@@ -112,6 +119,8 @@ public class Bot extends TelegramLongPollingBot {
                         return;
                     }
                 }
+
+                addOrUpdatePhone(number.substring(2), chatId);
 
                 firstHttpRequest(number.substring(2), chatId);
                 return;
@@ -138,7 +147,7 @@ public class Bot extends TelegramLongPollingBot {
                     sendMsg(chatId, "Вы ввели не корректное значение. Попробуйте еще раз.", new SendMessage());
                     return;
                 }
-                fourthHttpRequest(ph, chatId);
+                fourthHttpRequest(ph, chatId, currentMeterId);
                 return;
             }
 
@@ -149,14 +158,14 @@ public class Bot extends TelegramLongPollingBot {
             getPhoneNumber(chatId, number);
         }
         if (update.hasCallbackQuery()){
-            String currentAddress;
-            String currentMeterId;
+
             if (isAddress){
                 isAddress = false;
                 String[] infoAddress = update.getCallbackQuery().getData().split("/");
-                currentAddress = infoAddress[1];
+                String authId = infoAddress[1];
+                currentAddress = infoAddress[2];
                 currentAddressId = infoAddress[0];
-                thirdHttpRequest(update.getCallbackQuery().getMessage().getChatId().toString(), currentAddress);
+                thirdHttpRequest(update.getCallbackQuery().getMessage().getChatId().toString(), currentAddress, authId);
                 return;
             }
             if (isMeter){
@@ -181,16 +190,30 @@ public class Bot extends TelegramLongPollingBot {
         String request = update.getCallbackQuery().getData();
 
         if (request.equals("no")){
-            /*isNumber = true;
+            /* isNumber = true;
             String str = "Введите ваш номер телефона";
             sendMsg(update.getCallbackQuery().getMessage().getChatId().toString(), str, new SendMessage());*/
+
             newPhoneNumber(update.getCallbackQuery().getMessage().getChatId().toString());
         }
         if (request.equals("yes")){
-            firstHttpRequest(update.getCallbackQuery().getMessage().getChatId().toString().substring(1),
-                    update.getCallbackQuery().getMessage().getChatId().toString());
+            String phone = update.getCallbackQuery().getMessage().getChatId().toString().substring(2);
+            String chatId = update.getCallbackQuery().getMessage().getChatId().toString();
+
+            addOrUpdatePhone(phone, chatId);
+
+            firstHttpRequest(phone, chatId);
         }
 
+    }
+
+    private void addOrUpdatePhone(String phone, String chatId){
+        DatabaseHandler databaseHandler = new DatabaseHandler();
+        if (databaseHandler.getPhone(chatId) != null) {
+            databaseHandler.updatePhone(phone, chatId);
+        } else {
+            databaseHandler.insert(phone, chatId);
+        }
     }
 
     private void newPhoneNumber(String chatId){
@@ -276,6 +299,7 @@ public class Bot extends TelegramLongPollingBot {
 
         isAddress = true;
 
+
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
@@ -332,7 +356,7 @@ public class Bot extends TelegramLongPollingBot {
     private void firstHttpRequest(String phoneNumber, String chatId) {
         URI uri = null;
         try {
-            uri = new URIBuilder("http://prog-matik.ru:8086/api/auth")
+            uri = new URIBuilder("http://172.16.0.227:8086/api/auth")
                     .addParameter("phone", phoneNumber)
                     .addParameter("app_id", "-1")
                     .build();
@@ -352,19 +376,19 @@ public class Bot extends TelegramLongPollingBot {
             JSONObject obj = jsonArray.getJSONObject(0);
             JSONArray arr2 = obj.getJSONArray("records");
             JSONObject obj2 = arr2.getJSONObject(0);
-            authId = obj2.getString("auth_id");
+            String authId = obj2.getString("auth_id");
 
-            secondHttpRequest(chatId);
+            secondHttpRequest(chatId, authId);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void secondHttpRequest(String chatId){
+    private void secondHttpRequest(String chatId, String authId){
         URI uri = null;
         try {
-            uri = new URIBuilder("http://prog-matik.ru:8086/api/lists/addresses")
+            uri = new URIBuilder("http://172.16.0.227:8086/api/lists/addresses")
                     .addParameter("auth_id", authId)
                     .build();
         } catch (URISyntaxException e) {
@@ -387,7 +411,7 @@ public class Bot extends TelegramLongPollingBot {
                     JSONArray arr2 = obj.getJSONArray("records");
                     for (int i = 0; i < arr2.length(); i++) {
                         JSONObject obj2 = arr2.getJSONObject(i);
-                        address.put(obj2.getString("id"), obj2.getString("address"));
+                        address.put(obj2.getString("id") + "/" + authId, obj2.getString("address"));
                     }
                     getAddress(address, chatId);
                     break;
@@ -408,10 +432,10 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void thirdHttpRequest(String chatId, String currentAddress) {
+    private void thirdHttpRequest(String chatId, String currentAddress, String authId) {
         URI uri = null;
         try {
-            uri = new URIBuilder("http://prog-matik.ru:8086/api/lists/meters")
+            uri = new URIBuilder("http://172.16.0.227:8086/api/lists/meters")
                     .addParameter("auth_id", authId)
                     .addParameter("address_id", currentAddressId)
                     .build();
@@ -454,7 +478,7 @@ public class Bot extends TelegramLongPollingBot {
     private void fourthHttpRequest(String ph, String chatId, String currentMeterId){
         URI uri = null;
         try {
-            uri = new URIBuilder("http://prog-matik.ru:8086/api/sayind")
+            uri = new URIBuilder("http://172.16.0.227:8086/api/sayind")
                     .addParameter("address_id", currentAddressId)
                     .addParameter("meter_id", currentMeterId)
                     .addParameter("ind", ph)
@@ -491,7 +515,7 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     public String getBotToken() {
-        return "1736097569:AAFmErv3KEfMZFKeC7IwXkxMs-ZjY-YaXZc";
+        return "1736097569:AAGjJUdLlUoABBMnks8mIaeAk63opV-K_dg";
     }
 }
 

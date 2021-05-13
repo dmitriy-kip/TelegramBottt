@@ -16,6 +16,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.generics.UpdatesHandler;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 import java.io.IOException;
@@ -154,7 +155,7 @@ public class Bot extends TelegramLongPollingBot {
         }
         if (update.hasMessage() && update.getMessage().hasContact()){
             String chatId = update.getMessage().getChatId().toString();
-            String number = "+" + update.getMessage().getContact().getPhoneNumber();
+            String number = update.getMessage().getContact().getPhoneNumber();
             getPhoneNumber(chatId, number);
         }
         if (update.hasCallbackQuery()){
@@ -411,7 +412,9 @@ public class Bot extends TelegramLongPollingBot {
                     JSONArray arr2 = obj.getJSONArray("records");
                     for (int i = 0; i < arr2.length(); i++) {
                         JSONObject obj2 = arr2.getJSONObject(i);
-                        address.put(obj2.getString("id") + "/" + authId, obj2.getString("address"));
+                        String adr = obj2.getString("address");
+                        adr = adr.substring(0, adr.lastIndexOf(';'));
+                        address.put(obj2.getString("id") + "/" + authId, adr);
                     }
                     getAddress(address, chatId);
                     break;
@@ -479,7 +482,7 @@ public class Bot extends TelegramLongPollingBot {
         URI uri = null;
         try {
             uri = new URIBuilder("http://172.16.0.227:8086/api/sayind")
-                    .addParameter("address_id", currentAddressId)
+                    .addParameter("addr_id", currentAddressId)
                     .addParameter("meter_id", currentMeterId)
                     .addParameter("ind", ph)
                     .build();
@@ -501,6 +504,9 @@ public class Bot extends TelegramLongPollingBot {
                     break;
                 case "Charge of one of meters already exists":
                     sendMsg(chatId, "По данному счетчику уже есть показания.", new SendMessage());
+                    break;
+                case "Required parameters are not transferred":
+                    sendMsg(chatId, "Required parameters are not transferred", new SendMessage());
                     break;
                 default:
             }

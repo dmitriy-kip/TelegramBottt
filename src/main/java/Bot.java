@@ -1,3 +1,5 @@
+import org.apache.http.HttpHost;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
@@ -6,6 +8,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -40,16 +43,37 @@ public class Bot extends TelegramLongPollingBot {
 
 
 
-    public static void main(String[] args) {
-        try {
+    public static void main(String[] args) throws TelegramApiException {
+        /*try {
             TelegramBotsApi botApi = new TelegramBotsApi(DefaultBotSession.class);
             botApi.registerBot(new Bot());
         } catch (TelegramApiException e) {
             e.printStackTrace();
+        }*/
+
+        //TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
+
+        Runnable r = () -> {
+            try {
+                TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
+                botsApi.registerBot(new Bot());
+            } catch (TelegramApiException ex) {
+                ex.printStackTrace();
+            }
+        };
+
+        new Thread(r).start();
+
+        while (true) {
+            try {
+                Thread.sleep(80000L);
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
         }
     }
 
-    public void onUpdateReceived(Update update) {
+    public synchronized void onUpdateReceived(Update update) {
 
         if (update.hasMessage() && update.getMessage().hasText()){
             String chatId = update.getMessage().getChatId().toString();
